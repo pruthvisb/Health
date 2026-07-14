@@ -1,0 +1,133 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String?
+  googleId     String?       @unique
+  appleId      String?       @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  profile      Profile?
+  weightLogs   WeightLog[]
+  foodLogs     FoodLog[]
+  waterLogs    WaterLog[]
+  workoutLogs  WorkoutLog[]
+  goals        Goal[]
+  streaks      Streak[]
+  achievements Achievement[]
+  userStats    UserStats?
+}
+
+model Profile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  age               Int
+  gender            String
+  height            Float    // in cm
+  currentWeight     Float    // in kg
+  goalWeight        Float    // in kg
+  targetDate        DateTime
+  activityLevel     String   // SEDENTARY, LIGHTLY_ACTIVE, MODERATELY_ACTIVE, VERY_ACTIVE
+  lifestyle         String?  // sedentary, active, etc.
+  medicalConditions String[] // array of conditions
+  foodPreferences   String[] // VEGETARIAN, VEGAN, EGGETARIAN, NON_VEGETARIAN
+  foodAllergies     String[] // list of allergies
+  country           String
+  timezone          String
+  units             String   // METRIC, IMPERIAL
+  updatedAt         DateTime @updatedAt
+}
+
+model WeightLog {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weight   Float    // in kg
+  loggedAt DateTime @default(now())
+}
+
+model FoodLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealType    String   // BREAKFAST, LUNCH, DINNER, SNACK
+  foodName    String
+  calories    Float    // kcal
+  protein     Float    // g
+  fat         Float    // g
+  carbs       Float    // g
+  fiber       Float?   // g
+  sugar       Float?   // g
+  sodium      Float?   // mg
+  ingredients String[] // list of ingredients detected/saved
+  weightGrams Float?   // estimated weight
+  imageUrl    String?  // path to Supabase storage image
+  confidence  Float?   // AI recognition confidence score (0-1)
+  loggedAt    DateTime @default(now())
+}
+
+model WaterLog {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type     String   // WATER, COFFEE, TEA, JUICE, MILK, ELECTROLYTES
+  amountMl Int      // ml
+  loggedAt DateTime @default(now())
+}
+
+model WorkoutLog {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String   // WALKING, RUNNING, CYCLING, SWIMMING, GYM, YOGA, HOME
+  durationMinutes Int
+  caloriesBurned  Float
+  loggedAt       DateTime @default(now())
+}
+
+model Goal {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // LOSE_WEIGHT, GAIN_MUSCLE, MAINTAIN_WEIGHT, DRINK_WATER, EXERCISE, SLEEP, HEALTHY_EATING
+  targetValue  Float
+  currentValue Float
+  completed    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Streak {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String   // DAILY_LOG, WATER, WORKOUT, HEALTHY_EATING, WEIGHT
+  count          Int      @default(0)
+  lastLoggedDate DateTime @default(now())
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeName   String
+  badgeIcon   String   // icon identifier
+  description String
+  earnedAt    DateTime @default(now())
+}
+
+model UserStats {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  xp     Int    @default(0)
+  level  Int    @default(1)
+}
