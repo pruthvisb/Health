@@ -18,6 +18,8 @@ import StreaksView from '../components/StreaksView';
 import ReportsView from '../components/ReportsView';
 import SettingsView from '../components/SettingsView';
 import SleepTrackerView from '../components/SleepTrackerView';
+import LandingPage from '../components/LandingPage';
+import { createClient } from '../utils/supabase/client';
 
 // Icons
 import { 
@@ -28,21 +30,70 @@ import {
 type TabType = 'Dashboard' | 'Weight' | 'Food' | 'Water' | 'Workouts' | 'Sleep' | 'Meal Planner' | 'Analytics' | 'AI Coach' | 'Streaks/XP' | 'Reports' | 'Settings';
 
 export default function Home() {
+  const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('Dashboard');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(false);
 
   useEffect(() => {
-    // Check if profile exists in storage (or load defaults on first visit if we want to bypass onboarding, or require it)
-    const isFirstVisit = !localStorage.getItem('hsa_profile');
-    if (!isFirstVisit) {
-      setProfile(storage.getProfile());
+    // Retrieve cached session
+    const savedUser = localStorage.getItem('hsa_user');
+    const savedProfile = localStorage.getItem('hsa_profile');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
     }
+    if (savedProfile) {
+      setProfile(JSON.parse(savedProfile));
+    }
+
+    // Bind Supabase auth state change
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        localStorage.setItem('hsa_user', JSON.stringify(session.user));
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        localStorage.setItem('hsa_user', JSON.stringify(session.user));
+      } else if (_event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+        localStorage.removeItem('hsa_user');
+        localStorage.removeItem('hsa_profile');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const handleAuthSuccess = (sessionUser: any) => {
+    setUser(sessionUser);
+    localStorage.setItem('hsa_user', JSON.stringify(sessionUser));
+    const savedProfile = localStorage.getItem('hsa_profile');
+    if (savedProfile) {
+      setProfile(JSON.parse(savedProfile));
+    }
+  };
+
+  const handleSignOut = () => {
+    setUser(null);
+    setProfile(null);
+    localStorage.removeItem('hsa_user');
+    localStorage.removeItem('hsa_profile');
+    const supabase = createClient();
+    supabase.auth.signOut();
+  };
 
   const handleOnboardingComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
+    localStorage.setItem('hsa_profile', JSON.stringify(newProfile));
     setActiveTab('Dashboard');
   };
 
@@ -66,9 +117,13 @@ export default function Home() {
     { name: 'Settings', icon: Settings },
   ] as const;
 
+  if (!user) {
+    return <LandingPage onAuthSuccess={handleAuthSuccess} />;
+  }
+
   if (!profile) {
     return (
-      <main className="min-h-screen bg-[#050508] text-white flex items-center justify-center font-sans">
+      <main className="min-h-screen bg-[#050508] text-white flex items-center justify-center font-sans w-full">
         <ProfileOnboarding onComplete={handleOnboardingComplete} />
       </main>
     );
@@ -271,7 +326,7 @@ export default function Home() {
                 <ReportsView />
               )}
               {activeTab === 'Settings' && (
-                <SettingsView onRefresh={handleRefreshState} />
+                <SettingsView onRefresh={handleRefreshState} onSignOut={handleSignOut} />
               )}
             </motion.div>
           </AnimatePresence>

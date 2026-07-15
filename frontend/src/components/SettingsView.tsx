@@ -6,9 +6,10 @@ import { Settings, Shield, RefreshCw, Trash2, Download, Moon, Sun, AlertCircle }
 
 interface SettingsViewProps {
   onRefresh: () => void;
+  onSignOut?: () => void;
 }
 
-export default function SettingsView({ onRefresh }: SettingsViewProps) {
+export default function SettingsView({ onRefresh, onSignOut }: SettingsViewProps) {
   const [profile, setProfile] = useState(storage.getProfile());
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -81,6 +82,16 @@ export default function SettingsView({ onRefresh }: SettingsViewProps) {
   const handleResetApp = () => {
     if (window.confirm("Are you sure you want to clear all logged weight, meals, hydration, and settings? This action is irreversible.")) {
       localStorage.clear();
+      window.location.reload();
+    }
+  };
+
+  const handleSignOut = () => {
+    if (onSignOut) {
+      onSignOut();
+    } else {
+      localStorage.removeItem('hsa_user');
+      localStorage.removeItem('hsa_profile');
       window.location.reload();
     }
   };
@@ -182,6 +193,20 @@ export default function SettingsView({ onRefresh }: SettingsViewProps) {
           </h3>
 
           <div className="flex justify-between items-center text-xs">
+            <div>
+              <span className="font-bold text-white block">Sign Out of Session</span>
+              <span className="text-gray-400 text-xxs mt-0.5">Disconnect from your email account</span>
+            </div>
+            
+            <button
+              onClick={handleSignOut}
+              className="px-4 py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-white font-bold transition-all flex items-center gap-1.5"
+            >
+              Sign Out
+            </button>
+          </div>
+
+          <div className="flex justify-between items-center text-xs border-t border-white/5 pt-4">
             <div>
               <span className="font-bold text-white block">Delete Local Profile & Logs</span>
               <span className="text-gray-400 text-xxs mt-0.5">Wipe all cache database, resets onboarding settings</span>
