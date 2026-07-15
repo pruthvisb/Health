@@ -33,6 +33,28 @@ export default function ProfileOnboarding({ onComplete }: ProfileOnboardingProps
 
   const handleSave = () => {
     storage.saveProfile(formData);
+    
+    // Scale and initialize weight log history to match user's entered current weight
+    const W = formData.currentWeight;
+    const initialLogs = [
+      { id: `w-init-1`, weight: parseFloat((W + 1.2).toFixed(1)), loggedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: `w-init-2`, weight: parseFloat((W + 0.8).toFixed(1)), loggedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: `w-init-3`, weight: parseFloat((W + 0.5).toFixed(1)), loggedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: `w-init-4`, weight: parseFloat((W + 0.2).toFixed(1)), loggedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: `w-init-5`, weight: W, loggedAt: new Date().toISOString() }
+    ];
+    storage.saveWeightLogs(initialLogs);
+
+    // Update goals matching the user target
+    const goals = storage.getGoals();
+    const weightGoal = goals.find(g => g.type === 'LOSE_WEIGHT' || g.type === 'GAIN_MUSCLE' || g.type === 'MAINTAIN_WEIGHT');
+    if (weightGoal) {
+      weightGoal.currentValue = W;
+      weightGoal.targetValue = formData.goalWeight;
+      weightGoal.name = `Reach ${formData.goalWeight} kg`;
+      storage.saveGoals(goals);
+    }
+
     storage.awardXp(200);
     onComplete(formData);
   };
