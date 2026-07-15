@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { storage } from '../utils/storage';
 import { 
   TrendingDown, Droplet, Flame, Trophy, Moon, 
-  Activity, Star, ChevronRight, Apple, Heart, Zap
+  Activity, Star, ChevronRight, Apple, Heart, Zap, Sparkles, RefreshCw
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -22,14 +22,61 @@ export default function DashboardView({ onNavigate, triggerRefresh }: DashboardV
   const [weights, setWeights] = useState(storage.getWeightLogs());
   const [workouts, setWorkouts] = useState(storage.getWorkoutLogs());
 
+  const [tips, setTips] = useState<any[]>([]);
+  const [loadingTips, setLoadingTips] = useState(false);
+
+  const fetchTips = async () => {
+    setLoadingTips(true);
+    try {
+      const res = await fetch('/api/lifestyle-tips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: storage.getProfile() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTips(data);
+        localStorage.setItem('hsa_lifestyle_tips', JSON.stringify(data));
+      }
+    } catch (err) {
+      console.error('Failed to fetch lifestyle tips:', err);
+    } finally {
+      setLoadingTips(false);
+    }
+  };
+
   useEffect(() => {
-    setProfile(storage.getProfile());
+    const freshProfile = storage.getProfile();
+    setProfile(freshProfile);
     setTodayCalories(storage.getTodayCalories());
     setTodayMacros(storage.getTodayMacros());
     setTodayWater(storage.getTodayWaterIntake());
     setStreaks(storage.getStreaks());
     setWeights(storage.getWeightLogs());
     setWorkouts(storage.getWorkoutLogs());
+
+    const cachedTips = localStorage.getItem('hsa_lifestyle_tips');
+    if (cachedTips) {
+      setTips(JSON.parse(cachedTips));
+    } else {
+      if (freshProfile.lifestyle) {
+        setLoadingTips(true);
+        fetch('/api/lifestyle-tips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: freshProfile })
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) {
+              setTips(data);
+              localStorage.setItem('hsa_lifestyle_tips', JSON.stringify(data));
+            }
+          })
+          .catch(err => console.error(err))
+          .finally(() => setLoadingTips(false));
+      }
+    }
   }, [triggerRefresh]);
 
   const waterGoal = 2500; // ml
@@ -98,6 +145,56 @@ export default function DashboardView({ onNavigate, triggerRefresh }: DashboardV
             <div className="bg-yellow-400 h-full" style={{ width: `${(streaks.xp % 1000) / 10}%` }} />
           </div>
         </div>
+      </div>
+
+      {/* AI Lifestyle Coaching Tips */}
+      <div className="glass-card p-6 border border-indigo-500/10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-bl-full pointer-events-none" />
+        
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles size={18} className="text-indigo-400" />
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">AI Lifestyle Recommendations</h2>
+          </div>
+          <button 
+            onClick={fetchTips} 
+            disabled={loadingTips}
+            className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={loadingTips ? "animate-spin" : ""} />
+            Regenerate Tips
+          </button>
+        </div>
+
+        {loadingTips ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white/5 border border-white/5 p-4 rounded-2xl animate-pulse space-y-2">
+                <div className="h-4 bg-white/10 rounded w-1/3" />
+                <div className="h-3 bg-white/5 rounded w-full" />
+                <div className="h-3 bg-white/5 rounded w-5/6" />
+              </div>
+            ))}
+          </div>
+        ) : tips.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {tips.map((tip: any, idx: number) => (
+              <div key={idx} className="bg-white/5 border border-white/5 p-4 rounded-2xl relative group hover:border-indigo-500/20 transition-all">
+                <div className="text-xxs text-indigo-400 font-bold uppercase mb-1">{tip.category}</div>
+                <h4 className="text-xs font-bold text-white mb-1.5">{tip.title}</h4>
+                <p className="text-xxs text-gray-400 leading-relaxed">{tip.tip}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-gray-400 italic">
+            {profile.lifestyle ? (
+              <span>Generating suggestions based on your lifestyle profile...</span>
+            ) : (
+              <span>Enter a lifestyle description (e.g. desk job, stands all day, travels frequently) in settings to load custom suggestions.</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Grid */}
