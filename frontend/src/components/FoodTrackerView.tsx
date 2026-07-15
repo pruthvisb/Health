@@ -33,6 +33,7 @@ export default function FoodTrackerView({ onRefresh }: FoodTrackerViewProps) {
   // Barcode Mock
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [scanningBarcode, setScanningBarcode] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
 
   // AI Image upload states
   const [isClassifying, setIsClassifying] = useState(false);
@@ -90,38 +91,27 @@ export default function FoodTrackerView({ onRefresh }: FoodTrackerViewProps) {
     refreshLocalLogs();
   };
 
-  // Barcode mock trigger
   const triggerBarcodeScan = () => {
     setShowBarcodeScanner(true);
     setScanningBarcode(true);
-    setTimeout(() => {
-      setScanningBarcode(false);
-      // Mock result
-      const mockBarcodeFood = {
-        foodName: "Premium Whey Protein Shake",
-        calories: 140,
-        protein: 26,
-        fat: 1.5,
-        carbs: 3,
-        fiber: 1,
-        sugar: 1,
-        sodium: 180,
-      };
-      storage.addFoodLog({
-        mealType: 'SNACK',
-        foodName: mockBarcodeFood.foodName,
-        calories: mockBarcodeFood.calories,
-        protein: mockBarcodeFood.protein,
-        fat: mockBarcodeFood.fat,
-        carbs: mockBarcodeFood.carbs,
-        fiber: mockBarcodeFood.fiber,
-        sugar: mockBarcodeFood.sugar,
-        sodium: mockBarcodeFood.sodium,
-        ingredients: ["Whey Protein Concentrate", "Cocoa Powder", "Natural Sweetener"]
-      });
-      refreshLocalLogs();
-      setTimeout(() => setShowBarcodeScanner(false), 800);
-    }, 2000);
+    setBarcodeInput('');
+  };
+
+  const handleBarcodeSubmit = () => {
+    setScanningBarcode(false);
+    setClassifiedMeal({
+      foodName: barcodeInput ? `Prepackaged Item (${barcodeInput})` : "Premium Whey Protein Shake",
+      calories: barcodeInput ? 240 : 140,
+      protein: barcodeInput ? 12 : 26,
+      fat: barcodeInput ? 8 : 1.5,
+      carbs: barcodeInput ? 30 : 3,
+      weightGrams: 250,
+      confidence: 1.0,
+      ingredients: barcodeInput 
+        ? ["Whole Wheat Flour", "Sugar", "Cocoa Butter", "Dairy Solids"]
+        : ["Whey Protein Concentrate", "Cocoa Powder", "Natural Sweetener"]
+    });
+    setShowBarcodeScanner(false);
   };
 
   // AI classification upload trigger
@@ -215,25 +205,49 @@ export default function FoodTrackerView({ onRefresh }: FoodTrackerViewProps) {
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md"
           >
             <div className="glass-panel max-w-sm w-full p-6 rounded-3xl text-center space-y-6 border border-sky-500/30">
-              <h3 className="text-lg font-bold text-white">Scanning Barcode...</h3>
-              <div className="relative w-48 h-32 border-2 border-dashed border-sky-400/40 rounded-xl mx-auto flex items-center justify-center overflow-hidden">
-                {scanningBarcode ? (
-                  <>
-                    <motion.div 
-                      className="absolute left-0 right-0 h-0.5 bg-sky-400"
-                      animate={{ y: [-50, 50] }}
-                      transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
+              <h3 className="text-lg font-bold text-white">Barcode Scanner</h3>
+              
+              <div className="space-y-4">
+                <div className="relative w-48 h-24 border border-dashed border-sky-500/20 rounded-xl mx-auto flex items-center justify-center overflow-hidden bg-white/5">
+                  <motion.div 
+                    className="absolute left-0 right-0 h-0.5 bg-sky-400"
+                    animate={{ y: [-35, 35] }}
+                    transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
+                  />
+                  <Barcode className="text-sky-400/45 animate-pulse" size={40} />
+                </div>
+                
+                <div className="space-y-2 text-left">
+                  <label className="block text-xxs text-gray-400 uppercase font-semibold">Enter Barcode Manually</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 8901058002315" 
+                      value={barcodeInput}
+                      onChange={e => setBarcodeInput(e.target.value)}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-sky-500/50"
                     />
-                    <Barcode className="text-gray-500 animate-pulse" size={48} />
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center text-emerald-400">
-                    <Check size={36} />
-                    <span className="text-xs font-semibold mt-1">Logged!</span>
+                    <button 
+                      onClick={handleBarcodeSubmit}
+                      className="px-4 py-2 bg-sky-500 hover:bg-sky-600 rounded-xl text-xs font-semibold text-white transition-colors"
+                    >
+                      Find Product
+                    </button>
                   </div>
-                )}
+                </div>
+
+                <div className="border-t border-white/5 pt-4">
+                  <button 
+                    onClick={() => { setBarcodeInput(''); handleBarcodeSubmit(); }}
+                    className="w-full py-2 bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/20 rounded-xl text-xs font-semibold text-sky-455 transition-all text-sky-400"
+                  >
+                    Simulate Mock Scan (Whey Shake)
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-gray-400">Point your camera at a barcode to automatically track prepackaged food.</p>
+
+              <p className="text-xxs text-gray-400">Enter a barcode number or tap simulated scan to review product nutrition facts.</p>
+              
               <button 
                 onClick={() => setShowBarcodeScanner(false)}
                 className="w-full py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white"

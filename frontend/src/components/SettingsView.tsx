@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { storage } from '../utils/storage';
 import { Settings, Shield, RefreshCw, Trash2, Download, Moon, Sun, AlertCircle } from 'lucide-react';
+import { createClient } from '../utils/supabase/client';
 
 interface SettingsViewProps {
   onRefresh: () => void;
@@ -79,9 +80,17 @@ export default function SettingsView({ onRefresh, onSignOut }: SettingsViewProps
     document.body.removeChild(link);
   };
 
-  const handleResetApp = () => {
+  const handleResetApp = async () => {
     if (window.confirm("Are you sure you want to clear all logged weight, meals, hydration, and settings? This action is irreversible.")) {
-      localStorage.clear();
+      storage.clearAllData();
+      try {
+        const supabase: any = createClient();
+        await supabase.auth.updateUser({
+          data: { profile: null }
+        });
+      } catch (err) {
+        console.warn(err);
+      }
       window.location.reload();
     }
   };

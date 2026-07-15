@@ -48,23 +48,38 @@ export default function Home() {
     }
 
     // Bind Supabase auth state change
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const supabase: any = createClient();
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
       if (session?.user) {
         setUser(session.user);
         localStorage.setItem('hsa_user', JSON.stringify(session.user));
+        
+        // Restore profile from metadata if available
+        const metaProfile = session.user.user_metadata?.profile;
+        if (metaProfile) {
+          setProfile(metaProfile);
+          localStorage.setItem('hsa_profile', JSON.stringify(metaProfile));
+        }
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       if (session?.user) {
         setUser(session.user);
         localStorage.setItem('hsa_user', JSON.stringify(session.user));
+        
+        // Restore profile from metadata if available
+        const metaProfile = session.user.user_metadata?.profile;
+        if (metaProfile) {
+          setProfile(metaProfile);
+          localStorage.setItem('hsa_profile', JSON.stringify(metaProfile));
+        }
       } else if (_event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
         localStorage.removeItem('hsa_user');
         localStorage.removeItem('hsa_profile');
+        localStorage.removeItem('hsa_lifestyle_tips');
       }
     });
 
@@ -76,19 +91,33 @@ export default function Home() {
   const handleAuthSuccess = (sessionUser: any) => {
     setUser(sessionUser);
     localStorage.setItem('hsa_user', JSON.stringify(sessionUser));
-    const savedProfile = localStorage.getItem('hsa_profile');
-    if (savedProfile) {
-      setProfile(JSON.parse(savedProfile));
+    
+    // Check if user has metadata profile, otherwise read from local storage
+    const metaProfile = sessionUser.user_metadata?.profile;
+    if (metaProfile) {
+      setProfile(metaProfile);
+      localStorage.setItem('hsa_profile', JSON.stringify(metaProfile));
+    } else {
+      const savedProfile = localStorage.getItem('hsa_profile');
+      if (savedProfile) {
+        setProfile(JSON.parse(savedProfile));
+      }
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     setUser(null);
     setProfile(null);
     localStorage.removeItem('hsa_user');
     localStorage.removeItem('hsa_profile');
-    const supabase = createClient();
-    supabase.auth.signOut();
+    localStorage.removeItem('hsa_lifestyle_tips');
+    try {
+      const supabase: any = createClient();
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn(err);
+    }
+    window.location.reload();
   };
 
   const handleOnboardingComplete = (newProfile: UserProfile) => {
@@ -176,15 +205,25 @@ export default function Home() {
 
         {/* Footer profile shortcut */}
         <div className="border-t border-white/5 pt-4 flex items-center gap-3 px-2">
-          <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 font-bold text-xs uppercase">
+          <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 font-bold text-xs uppercase shrink-0">
             {profile.gender.charAt(0)}
           </div>
-          <div>
-            <div className="text-xs font-bold text-white uppercase tracking-wider">{profile.country} Client</div>
-            <button onClick={() => {
-              localStorage.removeItem('hsa_profile');
-              window.location.reload();
-            }} className="text-xxs text-gray-500 hover:text-emerald-400 uppercase tracking-widest font-semibold block mt-0.5">
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-white uppercase tracking-wider truncate">{profile.country} Client</div>
+            <button onClick={async () => {
+              if (window.confirm("Are you sure you want to reset your onboarding and delete all your health logs? This action is irreversible.")) {
+                storage.clearAllData();
+                try {
+                  const supabase: any = createClient();
+                  await supabase.auth.updateUser({
+                    data: { profile: null }
+                  });
+                } catch (err) {
+                  console.warn(err);
+                }
+                window.location.reload();
+              }
+            }} className="text-xxs text-gray-500 hover:text-rose-400 uppercase tracking-widest font-semibold block mt-1 transition-colors whitespace-nowrap">
               Reset Onboarding
             </button>
           </div>

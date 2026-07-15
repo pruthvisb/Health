@@ -23,9 +23,87 @@ export default function ReportsView() {
   const initialWeight = weights.length > 0 ? weights[0].weight : profile.currentWeight;
   const lostWeight = (initialWeight - latestWeight).toFixed(1);
 
-  const avgCalories = 1940;
-  const avgProtein = 94;
-  const avgWater = 2100;
+  const getAvgCalories = () => {
+    const periodDays = reportType === 'weekly' ? 7 : 30;
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - periodDays);
+    const filtered = foods.filter(f => new Date(f.loggedAt) >= limitDate);
+    if (filtered.length === 0) return 0;
+    const total = filtered.reduce((sum, f) => sum + f.calories, 0);
+    return Math.round(total / periodDays);
+  };
+
+  const getAvgProtein = () => {
+    const periodDays = reportType === 'weekly' ? 7 : 30;
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - periodDays);
+    const filtered = foods.filter(f => new Date(f.loggedAt) >= limitDate);
+    if (filtered.length === 0) return 0;
+    const total = filtered.reduce((sum, f) => sum + f.protein, 0);
+    return Math.round(total / periodDays);
+  };
+
+  const getAvgWater = () => {
+    const periodDays = reportType === 'weekly' ? 7 : 30;
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - periodDays);
+    const filtered = waters.filter(w => new Date(w.loggedAt) >= limitDate);
+    if (filtered.length === 0) return 0;
+    const total = filtered.reduce((sum, w) => sum + w.amountMl, 0);
+    return Math.round(total / periodDays);
+  };
+
+  const avgCalories = getAvgCalories();
+  const avgProtein = getAvgProtein();
+  const avgWater = getAvgWater();
+
+  // Dynamic Scores
+  const calculateScores = () => {
+    const targetCals = profile.goalWeight < profile.currentWeight ? 2000 : 2500;
+    
+    // Nutrition Score
+    let nutrition = 0;
+    if (avgCalories > 0) {
+      const calDiff = Math.abs(avgCalories - targetCals);
+      nutrition = Math.max(30, 100 - Math.round(calDiff / 10));
+    }
+    
+    // Hydration Score
+    const hydration = avgWater > 0 ? Math.min(100, Math.round((avgWater / 2500) * 100)) : 0;
+    
+    // Sleep Score
+    const periodDays = reportType === 'weekly' ? 7 : 30;
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - periodDays);
+    const sleepLogs = storage.getSleepLogs();
+    const filteredSleep = sleepLogs.filter(s => new Date(s.loggedAt) >= limitDate);
+    const avgSleep = filteredSleep.length > 0 
+      ? filteredSleep.reduce((sum, s) => sum + s.durationHours, 0) / filteredSleep.length
+      : 0;
+    const sleepScore = avgSleep > 0 ? Math.min(100, Math.round((avgSleep / 8) * 100)) : 0;
+
+    // Activity Score
+    const filteredWorkouts = workouts.filter(w => new Date(w.loggedAt) >= limitDate);
+    const activityScore = Math.min(100, filteredWorkouts.length * 20); // 5 sessions = 100%
+
+    // Health Score
+    const activeMetrics = [nutrition, hydration, sleepScore, activityScore].filter(val => val > 0);
+    const health = activeMetrics.length > 0 
+      ? Math.round(activeMetrics.reduce((s, v) => s + v, 0) / activeMetrics.length)
+      : 0;
+
+    return { health, nutrition, hydration, sleepScore, activityScore };
+  };
+
+  const dynamicScores = calculateScores();
+
+  const scores = [
+    { label: "Health Score", value: dynamicScores.health, color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/10" },
+    { label: "Nutrition Score", value: dynamicScores.nutrition, color: "text-amber-400 border-amber-500/20 bg-amber-500/10" },
+    { label: "Hydration Score", value: dynamicScores.hydration, color: "text-sky-400 border-sky-500/20 bg-sky-500/10" },
+    { label: "Sleep Score", value: dynamicScores.sleepScore, color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/10" },
+    { label: "Activity Score", value: dynamicScores.activityScore, color: "text-red-400 border-red-500/20 bg-red-500/10" }
+  ];
   
   const handleDownloadPDF = async () => {
     if (!reportRef.current) return;
@@ -62,14 +140,6 @@ export default function ReportsView() {
       setIsGenerating(false);
     }
   };
-
-  const scores = [
-    { label: "Health Score", value: 85, color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/10" },
-    { label: "Nutrition Score", value: 78, color: "text-amber-400 border-amber-500/20 bg-amber-500/10" },
-    { label: "Hydration Score", value: 92, color: "text-sky-400 border-sky-500/20 bg-sky-500/10" },
-    { label: "Sleep Score", value: 82, color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/10" },
-    { label: "Activity Score", value: 88, color: "text-red-400 border-red-500/20 bg-red-500/10" }
-  ];
 
   return (
     <div className="space-y-6">
@@ -194,12 +264,12 @@ export default function ReportsView() {
                 <span>Completed {workouts.length} active sessions</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-gray-300">
-                <Check size={14} className="text-emerald-400 shrink-0" />
-                <span>Unlocked 'Hydration Hero' badge</span>
+                <Check size={14} className={avgWater >= 2000 ? "text-emerald-400 shrink-0" : "text-gray-600 shrink-0"} />
+                <span>{avgWater >= 2000 ? "Unlocked 'Hydration Hero' badge" : "Hydration average: target 2.0L+ daily to unlock badge"}</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-gray-300">
-                <Check size={14} className="text-emerald-400 shrink-0" />
-                <span>Maintained calorie deficit 6 out of 7 days</span>
+                <Check size={14} className={avgCalories > 0 ? "text-emerald-400 shrink-0" : "text-gray-600 shrink-0"} />
+                <span>{avgCalories > 0 ? "Maintained structured nutrition logs" : "Goal: start logging daily calorie targets"}</span>
               </div>
             </div>
           </div>
@@ -214,13 +284,19 @@ export default function ReportsView() {
 
           <div className="text-xs text-gray-300 space-y-2.5 leading-relaxed">
             <p>
-              <strong>1. Cardio deficit adjustment:</strong> You logged an average deficit of 420 kcal/day. Weight loss is currently trending at ~0.45kg/week, which is extremely healthy and sustainable.
+              <strong>1. Caloric Deficit Focus:</strong> {avgCalories > 0 
+                ? `You logged an average intake of ${avgCalories} kcal/day. Keep tracking meals consistently to stay within your targets.` 
+                : 'No calorie data has been logged. Use the food scanner tool to record your breakfast, lunch, and dinner.'}
             </p>
             <p>
-              <strong>2. Hydration:</strong> Excellent hydration profile! Your sleep quality matches days with higher water intake. Try to maintain the 2.5L volume.
+              <strong>2. Hydration Efficiency:</strong> {avgWater > 0 
+                ? `Excellent hydration profile with an average of ${avgWater} ml/day. Maintaining water intake keeps metabolic rate high.` 
+                : 'No water logs found. Aim to consume at least 2.5L daily to optimize cognitive performance.'}
             </p>
             <p>
-              <strong>3. Protein Deficiency Warning:</strong> Protein intake hovered around 94g, slightly below your optimal target of {Math.round(profile.currentWeight * 2)}g. Consider adding Greek yogurt or egg whites to breakfast to boost amino acid retention.
+              <strong>3. Protein Deficiency Warning:</strong> {avgProtein > 0 
+                ? `Protein intake averaged ${avgProtein}g. Ensure you hit your target protein of ${Math.round(profile.currentWeight * 2)}g to assist muscle recovery.` 
+                : `Protein tracking is inactive. Aim for 1.6-2g of protein per kg of bodyweight (${Math.round(profile.currentWeight * 2)}g daily).`}
             </p>
           </div>
         </div>

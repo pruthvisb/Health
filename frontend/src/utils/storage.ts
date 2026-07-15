@@ -116,19 +116,19 @@ const DEFAULT_SLEEP: SleepLog[] = [];
 
 const DEFAULT_GOALS: Goal[] = [
   { id: "g-1", type: "LOSE_WEIGHT", name: "Reach 76 kg", targetValue: 76.0, currentValue: 84.5, unit: "kg", completed: false },
-  { id: "g-2", type: "DRINK_WATER", name: "Daily Hydration Goal", targetValue: 2500, currentValue: 1750, unit: "ml", completed: false },
-  { id: "g-3", type: "EXERCISE", name: "Weekly Active Minutes", targetValue: 150, currentValue: 135, unit: "mins", completed: false },
-  { id: "g-4", type: "SLEEP", name: "Sleep Hours", targetValue: 8.0, currentValue: 7.2, unit: "hours", completed: false }
+  { id: "g-2", type: "DRINK_WATER", name: "Daily Hydration Goal", targetValue: 2500, currentValue: 0, unit: "ml", completed: false },
+  { id: "g-3", type: "EXERCISE", name: "Weekly Active Minutes", targetValue: 150, currentValue: 0, unit: "mins", completed: false },
+  { id: "g-4", type: "SLEEP", name: "Sleep Hours", targetValue: 8.0, currentValue: 0, unit: "hours", completed: false }
 ];
 
 const DEFAULT_STREAKS: Streaks = {
-  dailyLogging: 12,
-  water: 5,
-  workout: 3,
-  healthyEating: 7,
-  weightLogging: 12,
-  xp: 1450,
-  level: 4
+  dailyLogging: 0,
+  water: 0,
+  workout: 0,
+  healthyEating: 0,
+  weightLogging: 0,
+  xp: 0,
+  level: 1
 };
 
 // Check if window is defined for client-side execution
@@ -376,5 +376,15 @@ export const storage = {
       fat += f.fat;
     });
     return { protein, carbs, fat };
+  },
+
+  clearAllData: (): void => {
+    if (typeof window !== 'undefined') {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('hsa_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
   }
 };

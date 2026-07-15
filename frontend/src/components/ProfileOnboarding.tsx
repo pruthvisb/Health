@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserProfile, storage } from '../utils/storage';
 import { Activity, Target, User, Heart, Settings, Globe } from 'lucide-react';
+import { createClient } from '../utils/supabase/client';
 
 interface ProfileOnboardingProps {
   onComplete: (profile: UserProfile) => void;
@@ -19,7 +20,7 @@ export default function ProfileOnboarding({ onComplete }: ProfileOnboardingProps
     goalWeight: 70,
     targetDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     activityLevel: 'MODERATELY_ACTIVE',
-    lifestyle: 'desk-job',
+    lifestyle: '',
     medicalConditions: [],
     foodPreferences: ['NON_VEGETARIAN'],
     foodAllergies: [],
@@ -31,17 +32,13 @@ export default function ProfileOnboarding({ onComplete }: ProfileOnboardingProps
   const nextStep = () => setStep(prev => Math.min(prev + 1, 5));
   const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
 
-  const handleSave = () => {
+  const handleSave = async () => {
     storage.saveProfile(formData);
     
     // Scale and initialize weight log history to match user's entered current weight
     const W = formData.currentWeight;
     const initialLogs = [
-      { id: `w-init-1`, weight: parseFloat((W + 1.2).toFixed(1)), loggedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: `w-init-2`, weight: parseFloat((W + 0.8).toFixed(1)), loggedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: `w-init-3`, weight: parseFloat((W + 0.5).toFixed(1)), loggedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: `w-init-4`, weight: parseFloat((W + 0.2).toFixed(1)), loggedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: `w-init-5`, weight: W, loggedAt: new Date().toISOString() }
+      { id: `w-init-1`, weight: W, loggedAt: new Date().toISOString() }
     ];
     storage.saveWeightLogs(initialLogs);
 
@@ -55,7 +52,16 @@ export default function ProfileOnboarding({ onComplete }: ProfileOnboardingProps
       storage.saveGoals(goals);
     }
 
-    storage.awardXp(200);
+    // Persist profile into Supabase user metadata
+    try {
+      const supabase = createClient();
+      await supabase.auth.updateUser({
+        data: { profile: formData }
+      });
+    } catch (err) {
+      console.warn("Failed to sync profile metadata to Supabase:", err);
+    }
+
     onComplete(formData);
   };
 

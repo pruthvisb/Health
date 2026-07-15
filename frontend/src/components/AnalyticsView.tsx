@@ -16,20 +16,44 @@ export default function AnalyticsView() {
   const [waterLogs, setWaterLogs] = useState(storage.getWaterLogs());
   const [workoutLogs, setWorkoutLogs] = useState(storage.getWorkoutLogs());
 
+  const [profile, setProfile] = useState(storage.getProfile());
+
   useEffect(() => {
+    setProfile(storage.getProfile());
     setWeightLogs(storage.getWeightLogs());
     setFoodLogs(storage.getFoodLogs());
     setWaterLogs(storage.getWaterLogs());
     setWorkoutLogs(storage.getWorkoutLogs());
   }, []);
 
-  // Generate date list
+  // Generate date list starting from the registration date (first weight log)
   const getDates = () => {
     const dates = [];
     const count = timeframe === '7days' ? 7 : 30;
-    for (let i = count - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+    
+    // Find the oldest weight log as the registration date
+    let regDate = new Date();
+    if (weightLogs.length > 0) {
+      const sortedWeights = [...weightLogs].sort(
+        (a, b) => new Date(a.loggedAt).getTime() - new Date(b.loggedAt).getTime()
+      );
+      regDate = new Date(sortedWeights[0].loggedAt);
+    }
+    
+    // Normalize to midnight
+    const regMidnight = new Date(regDate.getFullYear(), regDate.getMonth(), regDate.getDate());
+    const today = new Date();
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    // Calculate difference in days
+    const diffTime = Math.max(0, todayMidnight.getTime() - regMidnight.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // inclusive of today
+    
+    const displayDaysCount = Math.min(count, diffDays);
+
+    for (let i = displayDaysCount - 1; i >= 0; i--) {
+      const d = new Date(todayMidnight);
+      d.setDate(todayMidnight.getDate() - i);
       dates.push(d);
     }
     return dates;
@@ -45,9 +69,9 @@ export default function AnalyticsView() {
       const dayWeightLog = weightLogs.find(l => new Date(l.loggedAt).toDateString() === dateStr);
       let weight = dayWeightLog ? dayWeightLog.weight : null;
       if (!weight) {
-        // Fallback to closest past weight
+        // Fallback to closest past weight or the active profile currentWeight
         const pastLogs = weightLogs.filter(l => new Date(l.loggedAt).getTime() < date.getTime());
-        weight = pastLogs.length > 0 ? pastLogs[pastLogs.length - 1].weight : 84.5;
+        weight = pastLogs.length > 0 ? pastLogs[pastLogs.length - 1].weight : profile.currentWeight;
       }
 
       // Calories Consumed
@@ -55,27 +79,27 @@ export default function AnalyticsView() {
         .filter(f => new Date(f.loggedAt).toDateString() === dateStr)
         .reduce((sum, f) => sum + f.calories, 0);
 
-      // Calories Burned (TDEE baseline + active workouts)
-      const activeBurned = workoutLogs
+      // Calories Burned (only show active workouts burned calories)
+      const burned = workoutLogs
         .filter(w => new Date(w.loggedAt).toDateString() === dateStr)
         .reduce((sum, w) => sum + w.caloriesBurned, 0);
-      const maintenance = 2100; // estimated TDEE
-      const burned = maintenance + activeBurned;
 
       // Hydration
       const water = waterLogs
         .filter(w => new Date(w.loggedAt).toDateString() === dateStr)
         .reduce((sum, w) => sum + w.amountMl, 0);
 
-      // Sleep (mocked variation)
-      const sleep = 6.8 + (Math.sin(date.getDate()) * 1.2);
+      // Sleep
+      const sleepLogs = storage.getSleepLogs();
+      const sleepLog = sleepLogs.find(s => new Date(s.loggedAt).toDateString() === dateStr);
+      const sleep = sleepLog ? sleepLog.durationHours : 0;
 
       return {
         date: dateLabel,
         Weight: parseFloat(weight.toFixed(1)),
-        "Calories Consumed": consumed || 1800 + Math.round(Math.sin(date.getDate()) * 200), // default mock range if empty
+        "Calories Consumed": consumed,
         "Calories Burned": Math.round(burned),
-        Water: water || 1200 + Math.round(Math.cos(date.getDate()) * 800), // default mock range if empty
+        Water: water,
         Sleep: parseFloat(sleep.toFixed(1))
       };
     });
